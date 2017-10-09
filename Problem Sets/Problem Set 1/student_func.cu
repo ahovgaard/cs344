@@ -38,7 +38,6 @@ void rgba_to_greyscale(const uchar4* const rgbaImage,
                        unsigned char* const greyImage,
                        int numRows, int numCols)
 {
-  // TODO
   // Fill in the kernel to convert from color to greyscale
   // the mapping from components of a uchar4 to RGBA is:
   //  .x -> R ; .y -> G ; .z -> B ; .w -> A
@@ -50,17 +49,38 @@ void rgba_to_greyscale(const uchar4* const rgbaImage,
   // First create a mapping from the 2D block and grid locations
   // to an absolute 2D location in the image, then use that to
   // calculate a 1D offset
+
+  int x, y, offset;
+  uchar4 rgba;
+
+  x = (blockIdx.x * blockDim.x) + threadIdx.x;
+  y = (blockIdx.y * blockDim.y) + threadIdx.y;
+
+  offset = y * numCols + x;
+
+  if (offset < numCols * numRows) {
+    rgba = rgbaImage[offset];
+    greyImage[offset] = 0.299f * rgba.x + 0.587f * rgba.y + 0.114f * rgba.z;
+  }
 }
 
-void your_rgba_to_greyscale(const uchar4 * const h_rgbaImage, uchar4 * const d_rgbaImage,
-                            unsigned char* const d_greyImage, size_t numRows, size_t numCols)
+void your_rgba_to_greyscale(const uchar4 * const h_rgbaImage,
+                            uchar4 * const d_rgbaImage,
+                            unsigned char* const d_greyImage,
+                            size_t numRows, size_t numCols)
 {
-  //You must fill in the correct sizes for the blockSize and gridSize
-  //currently only one block with one thread is being launched
-  const dim3 blockSize(1, 1, 1);  //TODO
-  const dim3 gridSize( 1, 1, 1);  //TODO
-  rgba_to_greyscale<<<gridSize, blockSize>>>(d_rgbaImage, d_greyImage, numRows, numCols);
+  // You must fill in the correct sizes for the blockSize and gridSize,
+  // currently only one block with one thread is being launched.
+
+  // We organize the threads in 2D blocks of 8x8 = 64 threads per
+  // block, and a 2D grid of large enough size to cover the image.
+  const dim3 blockSize(16, 16);
+  const dim3 gridSize((numCols + blockSize.x - 1) / blockSize.x,
+                      (numRows + blockSize.y -1) / blockSize.y);
+
+  // Launch the kernel.
+  rgba_to_greyscale<<<gridSize, blockSize>>>
+    (d_rgbaImage, d_greyImage, numRows, numCols);
 
   cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
-
 }
